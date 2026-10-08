@@ -1,0 +1,18 @@
+name: Sync fork with upstream
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # täglich um 03:00 UTC
+  workflow_dispatch:        # zusätzlich manuell auslösbar über den "Run workflow"-Button
+
+permissions:
+  contents: write            # damit der Workflow tatsächlich auf deinen Fork pushen darf
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync master with ppy/osu-resources
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh repo sync ${{ github.repository }} --branch master
