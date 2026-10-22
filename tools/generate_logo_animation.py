@@ -15,7 +15,9 @@ along its path, like the original lazer logo:
 Requires Pillow, numpy, scipy and scikit-image.
 
 Usage:
-    python tools/generate_logo_animation.py [--preview <directory>]
+    python tools/generate_logo_animation.py [--logo <name>] [--preview <directory>]
+
+--logo selects the textures <name>-highlight.png and <name>-background.png (default: logo).
 """
 
 import argparse
@@ -34,13 +36,13 @@ TEXTURE_DIRECTORY = Path(__file__).resolve().parent.parent / "osu.Game.Resources
 # A higher curve makes the stroke appear quickly at first and slow down towards its end.
 # The values approximate the original lazer logo textures.
 TIMINGS = {
-    "logo-highlight": {
+    "highlight": {
         "outer_ring": (10, 216, 4.0),
         "inner_ring": (5, 10, 0.0),
         "letter": (5, 216, 7.0),
         "counter": (41, 41, 0.0),
     },
-    "logo-background": {
+    "background": {
         "outer_ring": (30, 242, 1.9),
         "inner_ring": (5, 30, 1.5),
         "letter": (5, 237, 2.5),
@@ -162,7 +164,8 @@ def timing(progress, start, end, curve):
     return start + (end - start) * (np.exp(curve * progress) - 1) / (math.exp(curve) - 1)
 
 
-def generate(name):
+def generate(logo, layer):
+    name = f"{logo}-{layer}"
     path = TEXTURE_DIRECTORY / f"{name}.png"
     image = np.array(Image.open(path).convert("RGB"))
     alpha = image[..., 1]
@@ -182,7 +185,7 @@ def generate(name):
     for label, kind in sorted(kinds.items()):
         skeleton = skeletonize(labels == label)
         progress = order_stroke(skeleton, *STARTS[kind])
-        start, end, curve = TIMINGS[name][kind]
+        start, end, curve = TIMINGS[layer][kind]
 
         for (y, x), u in progress.items():
             centre_lines[y, x] = True
@@ -201,7 +204,7 @@ def generate(name):
     return result
 
 
-def save_preview(textures, directory):
+def save_preview(logo, textures, directory):
     """
     Renders frames of the animation like sh_LogoAnimation.fs.
     As in IntroTriangles, the grey background is drawn above the white highlight, so the highlight is only visible ahead of the background.
@@ -215,8 +218,8 @@ def save_preview(textures, directory):
         return (texture[..., 0] / 255 < progress) * texture[..., 1] / 255
 
     for progress in [0.02, 0.05, 0.1, 0.2, 0.35, 0.5, 0.7, 0.85, 1.0]:
-        highlight = layer("logo-highlight", progress)
-        background = layer("logo-background", progress)
+        highlight = layer("highlight", progress)
+        background = layer("background", progress)
         frame = background * 0.6 + (1 - background) * highlight
 
         frames.append(Image.fromarray((frame * 255).astype(np.uint8)).resize((size, size), Image.LANCZOS))
@@ -227,18 +230,19 @@ def save_preview(textures, directory):
     for i, frame in enumerate(frames):
         sheet.paste(frame, (size * (i % columns), size * (i // columns)))
 
-    sheet.save(directory / "logo-animation-preview.png")
+    sheet.save(directory / f"{logo}-animation-preview.png")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--logo", default="logo", help="name of the logo textures to generate (<name>-highlight.png and <name>-background.png)")
     parser.add_argument("--preview", type=Path, help="directory to render frames of the animation to")
     args = parser.parse_args()
 
-    textures = {name: generate(name) for name in TIMINGS}
+    textures = {layer: generate(args.logo, layer) for layer in TIMINGS}
 
     if args.preview:
-        save_preview(textures, args.preview)
+        save_preview(args.logo, textures, args.preview)
 
 
 if __name__ == "__main__":
